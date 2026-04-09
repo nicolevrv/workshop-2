@@ -1,0 +1,12 @@
+# ── Generated data (pipeline outputs — never commit these) ────────────────────
+data/raw/*
+data/processed/
+data/star_schema/
+
+# Keep placeholder files that preserve empty folders in git
+!data/raw/.gitkeep
+!data/processed/.gitkeep
+
+venv/
+__pycache__/
+*.pyc
