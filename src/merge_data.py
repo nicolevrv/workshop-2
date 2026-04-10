@@ -1,7 +1,10 @@
 """
 merge_data.py - Task c: Dataset Merging
-Responsibility: merge the cleaned Spotify and Grammy datasets into a
-single enriched DataFrame ready for dimensional modeling.
+
+Responsibility
+--------------
+Merge the cleaned Spotify and Grammy datasets into a single enriched
+DataFrame ready for dimensional modeling.
 
 Merge strategy
 --------------
@@ -12,10 +15,10 @@ Merge strategy
 - Grammy records with artist_norm == 'unknown' are excluded from
   aggregation to avoid polluting the 'unknown' bucket with unrelated nominees.
 - The Grammy side is aggregated to one row per artist before joining,
-  so the merge never fan-outs Spotify rows.
+  so the merge never fans-out Spotify rows.
 
-Assumptions (for README)
-------------------------
+Assumptions
+-----------
 - A Grammy nomination is counted once per row in the Grammy dataset for
   that artist, regardless of whether they won.
 - 'first_grammy_year' and 'last_grammy_year' are set to NA (not 0) for
@@ -24,26 +27,37 @@ Assumptions (for README)
   listed after ';' do not inherit Grammy stats from the lead artist.
 """
 
+import logging
+
 import pandas as pd
 
+logger = logging.getLogger(__name__)
 
-# ── Grammy aggregation ────────────────────────────────────────────────────────
+
+# ── Grammy aggregation────────────────────────────────────────────────────────
 def _build_grammy_stats(grammy_df: pd.DataFrame) -> pd.DataFrame:
     """
-    Aggregate Grammy data to one summary row per artist.
-
+    Aggregate Grammy dataset into one summary row per artist.
     Excludes 'unknown' artists to avoid merging noise.
+
     Returns a DataFrame with columns:
         artist_norm, grammy_nominations, grammy_wins,
         first_grammy_year, last_grammy_year
     """
+    unknown_count = (grammy_df["artist_norm"] == "unknown").sum()
+    total_count = len(grammy_df)
+    logger.info(f"Grammy records: {total_count:,} total, {unknown_count:,} unknown (excluded)")
+
     usable = grammy_df[grammy_df["artist_norm"] != "unknown"].copy()
 
     if usable.empty:
-        print("  ⚠️  No usable Grammy records after filtering 'unknown' artists.")
+        logger.warning("No usable Grammy records after filtering 'unknown' artists.")
         return pd.DataFrame(columns=[
-            "artist_norm", "grammy_nominations", "grammy_wins",
-            "first_grammy_year", "last_grammy_year",
+            "artist_norm",
+            "grammy_nominations",
+            "grammy_wins",
+            "first_grammy_year",
+            "last_grammy_year",
         ])
 
     grammy_stats = (
@@ -56,18 +70,17 @@ def _build_grammy_stats(grammy_df: pd.DataFrame) -> pd.DataFrame:
         )
     )
 
-    # Cast win count to int (sum of booleans can be float if NAs exist)
+    grammy_stats["grammy_nominations"] = grammy_stats["grammy_nominations"].astype(int)
     grammy_stats["grammy_wins"] = grammy_stats["grammy_wins"].astype(int)
 
-    # Keep year columns as nullable Int64 — NA means "no Grammy history",
-    # which is semantically distinct from year 0.
+    # Nullable Int64 — NA means "no Grammy history", not year zero
     for col in ["first_grammy_year", "last_grammy_year"]:
         grammy_stats[col] = grammy_stats[col].astype("Int64")
 
     return grammy_stats
 
 
-# ── Merge ─────────────────────────────────────────────────────────────────────
+# ── Merge─────────────────────────────────────────────────────────────────────
 def merge_spotify_grammys(
     spotify_df: pd.DataFrame,
     grammys_df: pd.DataFrame,
@@ -77,8 +90,8 @@ def merge_spotify_grammys(
 
     Parameters
     ----------
-    spotify_df : cleaned Spotify DataFrame (from transform.clean_spotify)
-    grammys_df : cleaned Grammy DataFrame (from transform.clean_grammys)
+    spotify_df  : cleaned Spotify DataFrame (from transform.clean_spotify)
+    grammys_df  : cleaned Grammy DataFrame (from transform.clean_grammys)
 
     Returns
     -------
@@ -94,43 +107,55 @@ def merge_spotify_grammys(
     print("TASK c — MERGE")
     print("=" * 70)
 
-    # ── Build Grammy summary ──────────────────────────────────────────────────
-    grammy_stats = _build_grammy_stats(grammys_df)
-    print(f"\n  Grammy stats built: {len(grammy_stats):,} unique artists")
+    logger.info(f"Input shapes — Spotify: {spotify_df.shape}, Grammys: {grammys_df.shape}")
 
-    # ── Left join ────────────────────────────────────────────────────────────
+    # ── Build Grammy summary
+    grammy_stats = _build_grammy_stats(grammys_df)
+    print(f"\n✓ Grammy stats built: {len(grammy_stats):,} unique artists")
+
+    # ── LEFT JOIN — preserves all Spotify tracks
     merged = spotify_df.merge(grammy_stats, on="artist_norm", how="left")
 
-    # ── Fill nulls for non-Grammy artists ────────────────────────────────────
-    merged["grammy_nominations"] = merged["grammy_nominations"].fillna(0).astype(int)
-    merged["grammy_wins"]        = merged["grammy_wins"].fillna(0).astype(int)
+    # ── Fan-out guard: a correct LEFT JOIN must never add rows
+    if len(merged) != len(spotify_df):
+        raise ValueError(
+            f"Fan-out detected after merge: "
+            f"{len(spotify_df):,} Spotify rows → {len(merged):,} merged rows. "
+            f"Check for duplicate artist_norm values in grammy_stats."
+        )
 
-    # Year columns stay as NA (not 0) for artists with no Grammy history
+    # ── Fill nulls for non-Grammy artists (numeric only)
+    merged["grammy_nominations"] = merged["grammy_nominations"].fillna(0).astype(int)
+    merged["grammy_wins"] = merged["grammy_wins"].fillna(0).astype(int)
+
+    # Year columns stay as NA — do NOT fill with 0
     for col in ["first_grammy_year", "last_grammy_year"]:
         if col in merged.columns:
             merged[col] = merged[col].astype("Int64")
 
-    # ── Merge quality report ─────────────────────────────────────────────────
-    total          = len(merged)
-    with_grammys   = (merged["grammy_nominations"] > 0).sum()
-    without        = total - with_grammys
-    match_rate     = with_grammys / total * 100 if total else 0
+    # ── Quality report
+    total_tracks = len(merged)
+    with_grammys = (merged["grammy_nominations"] > 0).sum()
+    without_grammys = total_tracks - with_grammys
+    match_rate = (with_grammys / total_tracks) * 100 if total_tracks else 0
 
-    print(f"\n  Merged shape          : {merged.shape}")
-    print(f"  Tracks with Grammy data : {with_grammys:,} ({match_rate:.1f}%)")
-    print(f"  Tracks without Grammy   : {without:,} ({100 - match_rate:.1f}%)")
+    print("\n" + "-" * 50)
+    print("MERGE QUALITY REPORT")
+    print("-" * 50)
+    print(f"  Total Spotify tracks   : {total_tracks:,}")
+    print(f"  With Grammy data       : {with_grammys:,} ({match_rate:.2f}%)")
+    print(f"  Without Grammy data    : {without_grammys:,} ({100 - match_rate:.2f}%)")
+    print(f"  Unique Grammy artists  : {len(grammy_stats):,}")
 
-    # Warn if match rate is suspiciously low — could indicate a join key problem
-    if match_rate < 5:
-        print(
-            "  ⚠️  Match rate below 5% — verify that artist_norm is built "
-            "consistently in both datasets."
-        )
+    if match_rate < 1:
+        logger.warning("Match rate < 1% — verify that artist_norm is built consistently in both datasets.")
+
+    print("-" * 50)
 
     return merged
 
 
-# ── Runner ────────────────────────────────────────────────────────────────────
+# ── Runner────────────────────────────────────────────────────────────────────
 def run(spotify_clean: pd.DataFrame, grammy_clean: pd.DataFrame) -> pd.DataFrame:
     """Entry point called by main.py and the Airflow DAG."""
     return merge_spotify_grammys(spotify_clean, grammy_clean)
@@ -138,10 +163,11 @@ def run(spotify_clean: pd.DataFrame, grammy_clean: pd.DataFrame) -> pd.DataFrame
 
 if __name__ == "__main__":
     from extract import run as extract_run
-    from transform_spotify import run as transform_run
+    from transform import run as transform_run
 
     spotify_raw, grammy_raw = extract_run()
     spotify_clean, grammy_clean = transform_run(spotify_raw, grammy_raw)
+
     merged = run(spotify_clean, grammy_clean)
     print(f"\nFinal merged shape: {merged.shape}")
     print(merged.head(3).to_string(index=False))

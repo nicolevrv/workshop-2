@@ -10,20 +10,21 @@ Design decisions
 - INSERT IGNORE is used so the pipeline is idempotent: running it twice
   does not raise duplicate-key errors.
 - Tables are inserted in FK-safe order:
-    dims first (artist → album → genre → time), fact last.
-- All DDL lives in a single SQL file:
+  dims first (artist → album → genre → time), fact last.
+- All DDL lives in a single SQL file: sql/create_schema.sql
 """
 
 import os
-import pandas as pd
-import mysql.connector
 from pathlib import Path
 
-# ── Config ────────────────────────────────────────────────────────────────────
+import mysql.connector
+import pandas as pd
+
+# ── Config────────────────────────────────────────────────────────────────────
 DB_CONFIG = {
-    "host":     os.environ.get("DB_HOST",     "localhost"),
-    "user":     os.environ.get("DB_USER",     "etl_user"),
-    "password": os.environ.get("DB_PASSWORD", ""),        # never hardcode
+    "host":     os.environ.get("DB_HOST", "localhost"),
+    "user":     os.environ.get("DB_USER", "etl_user"),
+    "password": os.environ.get("DB_PASSWORD", ""),  # never hardcode
     "port":     int(os.environ.get("DB_PORT", 3306)),
 }
 DB_NAME = os.environ.get("DB_NAME", "music_dw")
@@ -32,7 +33,7 @@ DB_NAME = os.environ.get("DB_NAME", "music_dw")
 INSERT_ORDER = ["dim_artist", "dim_album", "dim_genre", "dim_time", "fact_track"]
 
 
-# ── Connection helpers ────────────────────────────────────────────────────────
+# ── Connection helpers────────────────────────────────────────────────────────
 def _connect(database: str | None = None) -> mysql.connector.MySQLConnection:
     """Open a MySQL connection, optionally targeting a specific database."""
     cfg = dict(DB_CONFIG)
@@ -41,7 +42,7 @@ def _connect(database: str | None = None) -> mysql.connector.MySQLConnection:
     return mysql.connector.connect(**cfg)
 
 
-# ── SQL file executor ─────────────────────────────────────────────────────────
+# ── SQL file executor─────────────────────────────────────────────────────────
 def _run_sql_file(cursor, path: Path) -> None:
     """Execute every non-empty statement in a SQL file."""
     sql = path.read_text(encoding="utf-8")
@@ -51,29 +52,29 @@ def _run_sql_file(cursor, path: Path) -> None:
             cursor.execute(stmt)
 
 
-# ── Generic inserter ──────────────────────────────────────────────────────────
+# ── Generic inserter──────────────────────────────────────────────────────────
 def _insert_df(conn, df: pd.DataFrame, table: str) -> None:
     if df.empty:
         print(f"  ⚠️  {table}: DataFrame is empty, skipping insert.")
         return
 
-    # Convertir a object primero, luego reemplazar TODOS los tipos de nulo
-    # (np.nan, pd.NA, pd.NaT) a None para que mysql-connector los acepte
+    # Convert to object first, then replace ALL null types
+    # (np.nan, pd.NA, pd.NaT) to None so mysql-connector accepts them
     df = df.astype(object).where(pd.notnull(df.astype(object)), None)
 
     cursor = conn.cursor()
-    cols         = ", ".join(df.columns)
+    cols = ", ".join(df.columns)
     placeholders = ", ".join(["%s"] * len(df.columns))
     sql = f"INSERT IGNORE INTO {table} ({cols}) VALUES ({placeholders})"
 
     data = [tuple(row) for row in df.itertuples(index=False, name=None)]
-
     cursor.executemany(sql, data)
     conn.commit()
     print(f"  {table:<20} {cursor.rowcount:>7,} rows inserted")
     cursor.close()
 
-# ── Main loader ───────────────────────────────────────────────────────────────
+
+# ── Main loader───────────────────────────────────────────────────────────────
 def load_star_schema(tables: dict[str, pd.DataFrame]) -> None:
     """
     Create the music_dw database, build all tables, and insert data.
@@ -81,14 +82,13 @@ def load_star_schema(tables: dict[str, pd.DataFrame]) -> None:
     Parameters
     ----------
     tables : dict returned by dimensional_model.run()
-             Expected keys: dim_artist, dim_album, dim_genre,
-                            dim_time, fact_track
+        Expected keys: dim_artist, dim_album, dim_genre, dim_time, fact_track
     """
     print("\n" + "=" * 70)
     print("TASK e — LOAD (Data Warehouse)")
     print("=" * 70)
 
-    root       = Path(__file__).parent.parent
+    root = Path(__file__).parent.parent
     schema_sql = root / "sql" / "create_schema.sql"
 
     if not schema_sql.exists():
@@ -97,16 +97,16 @@ def load_star_schema(tables: dict[str, pd.DataFrame]) -> None:
             f"Make sure sql/create_schema.sql exists in the project root."
         )
 
-    # ── 1. Create database + tables (single file, single connection) ──────────
+    # ── 1. Create database + tables
     print("\n[1/2] Creating database and tables...")
     conn = _connect()
-    cur  = conn.cursor()
+    cur = conn.cursor()
     _run_sql_file(cur, schema_sql)
     conn.commit()
     cur.close()
     conn.close()
 
-    # ── 2. Reconnect targeting the database, then insert ──────────────────────
+    # ── 2. Reconnect targeting the database, then insert
     print("[2/2] Inserting data...")
     conn = _connect(database=DB_NAME)
     for table_name in INSERT_ORDER:
@@ -114,13 +114,16 @@ def load_star_schema(tables: dict[str, pd.DataFrame]) -> None:
             print(f"  ⚠️  '{table_name}' not found in tables dict — skipping.")
             continue
         _insert_df(conn, tables[table_name], table_name)
-
     conn.close()
+
     print("\nData Warehouse load completed ✔")
 
 
-# ── Google Drive export ───────────────────────────────────────────────────────
-def save_to_google_drive(merged_df: pd.DataFrame, filename: str = "merged_dataset.csv") -> None:
+# ── Google Drive export───────────────────────────────────────────────────────
+def save_to_google_drive(
+    merged_df: pd.DataFrame,
+    filename: str = "merged_dataset.csv",
+) -> None:
     """
     Upload the merged dataset to Google Drive as a CSV file.
 
@@ -129,7 +132,6 @@ def save_to_google_drive(merged_df: pd.DataFrame, filename: str = "merged_datase
     Uses the Google Drive API v3 via the google-api-python-client library.
     Credentials are read from the path in the GOOGLE_CREDENTIALS_PATH
     environment variable (a service account JSON key).
-
     The file is uploaded to the folder specified by GOOGLE_DRIVE_FOLDER_ID
     (env var). If not set, it uploads to the root of the Drive.
 
@@ -146,9 +148,9 @@ def save_to_google_drive(merged_df: pd.DataFrame, filename: str = "merged_datase
     filename  : name of the CSV file on Google Drive
     """
     try:
+        from google.oauth2 import service_account
         from googleapiclient.discovery import build
         from googleapiclient.http import MediaInMemoryUpload
-        from google.oauth2 import service_account
     except ImportError:
         raise ImportError(
             "Google API libraries not installed.\n"
@@ -169,14 +171,14 @@ def save_to_google_drive(merged_df: pd.DataFrame, filename: str = "merged_datase
 
     # Auth
     scopes = ["https://www.googleapis.com/auth/drive.file"]
-    creds  = service_account.Credentials.from_service_account_file(
+    creds = service_account.Credentials.from_service_account_file(
         creds_path, scopes=scopes
     )
     service = build("drive", "v3", credentials=creds)
 
     # Serialize to CSV in memory
     csv_bytes = merged_df.to_csv(index=False).encode("utf-8")
-    media     = MediaInMemoryUpload(csv_bytes, mimetype="text/csv", resumable=False)
+    media = MediaInMemoryUpload(csv_bytes, mimetype="text/csv", resumable=False)
 
     # File metadata
     file_metadata = {"name": filename}
@@ -206,16 +208,18 @@ def save_to_google_drive(merged_df: pd.DataFrame, filename: str = "merged_datase
         print(f"  Created new file (id={result['id']}) ✔")
 
 
+# ── Standalone runner (development only)──────────────────────────────────────
 if __name__ == "__main__":
     from extract import run as extract_run
-    from transform_spotify import run as transform_run
+    from transform_spotify import run as transform_spotify_run
+    from transform_grammys import run as transform_grammys_run
     from merge_data import run as merge_run
     from dimensional_model import run as dim_run
 
-    spotify_raw, grammy_raw     = extract_run()
-    spotify_clean, grammy_clean = transform_run(spotify_raw, grammy_raw)
-    merged                      = merge_run(spotify_clean, grammy_clean)
-    tables                      = dim_run(merged)
-
+    spotify_raw, grammy_raw = extract_run()
+    spotify_clean = transform_spotify_run(spotify_raw)
+    grammy_clean = transform_grammys_run(grammy_raw)
+    merged = merge_run(spotify_clean, grammy_clean)
+    tables = dim_run(merged)
     load_star_schema(tables)
     save_to_google_drive(merged)
