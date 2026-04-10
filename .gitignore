@@ -1,12 +1,112 @@
-# ── Generated data (pipeline outputs — never commit these) ────────────────────
-data/raw/*
-data/processed/
-data/star_schema/
+# =============================================================================
+# ETL WORKSHOP 2 - GITIGNORE
+# Spotify × Grammy Awards ETL Pipeline
+# =============================================================================
 
-# Keep placeholder files that preserve empty folders in git
-!data/raw/.gitkeep
-!data/processed/.gitkeep
-
-venv/
+# ── Python ───────────────────────────────────────────────────────────────────
 __pycache__/
-*.pyc
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+
+# ── Virtual Environments ─────────────────────────────────────────────────────
+venv/
+ENV/
+env/
+.venv
+pip-log.txt
+pip-delete-this-directory.txt
+
+# ── IDEs and Editors ─────────────────────────────────────────────────────────
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+*.sublime-project
+*.sublime-workspace
+
+# ── Environment Variables & Secrets ──────────────────────────────────────────
+.env
+.env.local
+.env.*.local
+!.env.example
+credentials/*
+!credentials/.gitkeep
+*.json
+!credentials/service_account.json.example
+
+# ── Data Files (Pipeline Outputs - NEVER COMMIT) ─────────────────────────────
+data/raw/*
+!data/raw/.gitkeep
+data/processed/*
+!data/processed/.gitkeep
+data/star_schema/*
+!data/star_schema/.gitkeep
+*.csv
+!data/raw/spotify_dataset.csv.example
+!data/raw/the_grammy_awards.csv.example
+
+# ── Jupyter Notebooks ────────────────────────────────────────────────────────
+.ipynb_checkpoints/
+*.ipynb_checkpoints
+*.nbconvert.ipynb
+profile_default/
+ipython_config.py
+
+# ── Apache Airflow ───────────────────────────────────────────────────────────
+airflow/logs/
+airflow/plugins/
+airflow/config/
+airflow/airflow.db
+airflow/airflow.cfg
+airflow/webserver_config.py
+airflow/standalone_admin_password.txt
+airflow/*.pid
+
+# ── Docker ───────────────────────────────────────────────────────────────────
+.docker/
+docker-compose.override.yml
+
+# ── Testing ──────────────────────────────────────────────────────────────────
+.coverage
+htmlcov/
+.pytest_cache/
+.tox/
+.nox/
+coverage.xml
+*.cover
+.hypothesis/
+
+# ── Documentation Build ──────────────────────────────────────────────────────
+docs/_build/
+site/
+
+# ── MyPy ─────────────────────────────────────────────────────────────────────
+.mypy_cache/
+.dmypy.json
+dmypy.json
+
+# ── Misc ─────────────────────────────────────────────────────────────────────
+*.log
+*.tmp
+*.bak
+*.cache
