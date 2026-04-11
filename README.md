@@ -9,33 +9,33 @@
 ```
 WORKSHOP2/
 ├── airflow/
+│   ├── config/
 │   ├── dags/
-│   │   └── etl_dag.py          # Airflow DAG definition
-│   ├── .env                    # Airflow + DB credentials (Docker)
-│   └── docker-compose.yaml     # Airflow services
-├── credentials/
-│   └── service_account.json    # GCP service account key (never commit)
+│   ├── logs/
+│   └── docker-compose.yaml
 ├── data/
-│   ├── raw/                    # Source CSVs (never commit)
-│   ├── processed/              # Intermediate outputs
-│   └── star_schema/            # Optional local CSV export of DW tables
+│   ├── processed/
+│   ├── raw/
+│   └── star_schema/
 ├── notebooks/
-│   └── data_profiling.ipynb    # EDA notebook
+│   └── data_profiling.ipynb
 ├── sql/
-│   └── create_schema.sql       # DDL for the star schema
+│   └── create_schema.sql
 ├── src/
-│   ├── extract.py              # Task a — data extraction
-│   ├── transform_spotify.py    # Task b.1 — Spotify cleaning
-│   ├── transform_grammys.py    # Task b.2 — Grammy cleaning
-│   ├── merge_data.py           # Task c — dataset merging
-│   ├── dimensional_model.py    # Task d — star schema builder
-│   ├── load_dw.py              # Task e — DW loader + Google Drive
-│   ├── load_grammys_db.py      # One-time setup: CSV → MySQL
-│   └── main.py                 # Local pipeline runner (no Airflow)
-├── .env                        # Local credentials
+│   ├── dimensional_model.py
+│   ├── extract.py
+│   ├── load_dw.py
+│   ├── load_grammys_db.py
+│   ├── main.py
+│   ├── merge_data.py
+│   ├── transform_grammys.py
+│   └── transform_spotify.py
 ├── .gitignore
+├── ETL_Workshop-2.pdf
 ├── README.md
-└── setup.sh                    # One-command environment setup
+├── setup.bat
+├── setup.ps1
+└── setup.sh
 ```
 
 ---
@@ -79,7 +79,7 @@ Download both datasets and place them in `data/raw/`:
 
 ### 3. Configure environment variables
 
-Copy `.env.example` to `.env` and fill in your credentials:
+Copy this example to `.env` and fill in your credentials:
 
 ```env
 DB_HOST=localhost
@@ -88,7 +88,7 @@ DB_PASSWORD=your_password
 DB_PORT=3306
 DB_NAME=music_dw
 GOOGLE_CREDENTIALS_PATH=/opt/etl/credentials/service_account.json
-GOOGLE_DRIVE_FOLDER_ID=your_folder_id   # optional
+GOOGLE_DRIVE_FOLDER_ID=your_folder_id   
 ```
 
 ### 4. Run initial setup
