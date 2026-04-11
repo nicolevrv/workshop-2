@@ -1,5 +1,0 @@
-{"timestamp":"2026-04-10T18:14:28.270811Z","level":"info","event":"DAG bundles loaded: dags-folder","logger":"airflow.dag_processing.bundles.manager.DagBundlesManager","filename":"manager.py","lineno":209}
-{"timestamp":"2026-04-10T18:14:28.275789Z","level":"info","event":"Filling up the DagBag from /opt/airflow/dags/music_dag.py","logger":"airflow.dag_processing.dagbag.BundleDagBag","filename":"dagbag.py","lineno":469}
-{"timestamp":"2026-04-10T18:14:28.950137Z","level":"warning","event":"The `airflow.operators.python.PythonOperator` attribute is deprecated. Please use `'airflow.providers.standard.operators.python.PythonOperator'`.","category":"UserWarning","filename":"/opt/airflow/dags/music_dag.py","lineno":19,"logger":"py.warnings"}
-{"timestamp":"2026-04-10T18:14:28.990370Z","level":"info","event":"[store] ⚠️  GOOGLE_CREDENTIALS_PATH no configurado o archivo no existe. Skipping.","logger":"task.stdout"}
-{"timestamp":"2026-04-10T18:14:29.010896Z","level":"info","event":"Done. Returned value was: None","logger":"airflow.task.operators.airflow.providers.standard.operators.python.PythonOperator","filename":"python.py","lineno":229}
