@@ -76,13 +76,13 @@ CREATE TABLE fact_track (
     explicit            TINYINT(1)  DEFAULT 0,
     grammy_nominations  INT         NOT NULL DEFAULT 0,
     grammy_wins         INT         NOT NULL DEFAULT 0,
-    PRIMARY KEY (track_id),
+    PRIMARY KEY (track_id, genre_key),
     FOREIGN KEY (artist_key) REFERENCES dim_artist(artist_key)
         ON DELETE SET NULL ON UPDATE CASCADE,
     FOREIGN KEY (album_key)  REFERENCES dim_album(album_key)
         ON DELETE SET NULL ON UPDATE CASCADE,
     FOREIGN KEY (genre_key)  REFERENCES dim_genre(genre_key)
-        ON DELETE SET NULL ON UPDATE CASCADE,
+        ON UPDATE CASCADE,
     FOREIGN KEY (time_key)   REFERENCES dim_time(time_key)
         ON DELETE SET NULL ON UPDATE CASCADE,
     KEY idx_fact_artist  (artist_key),
