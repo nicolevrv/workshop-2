@@ -227,24 +227,7 @@ One row in `fact_track` = one unique `(track_id, genre)` combination.
 
 The Power BI dashboard connects directly to the `music_dw` MySQL database and queries the star schema. It does **not** use the CSV file.
 
-### KPIs
-
-| # | KPI | Source |
-|---|---|---|
-| 1 | Total Grammy Wins by Artist | `fact_track` + `dim_artist` |
-| 2 | Average Spotify Popularity — Grammy Winners vs. Non-Winners | `fact_track` |
-| 3 | Most danceable genres | `fact_track` + `dim_genre` |
-
-### Charts
-
-| # | Chart | Description |
-|---|---|---|
-| 1 | Grammy Nominations vs. Spotify Popularity (scatter) | Correlation between award recognition and streaming popularity |
-| 2 | Audio Features Radar by Genre | Danceability, energy, valence, acousticness per genre |
-| 3 | Grammy Wins Over Time (line) | Award trends from `dim_time` |
-| 4 | Top 10 Artists by Grammy Wins (bar) | Ranked by `grammy_wins` |
-
----
+![alt text](image.png)
 
 ## 🔑 Key Assumptions & Decisions
 
