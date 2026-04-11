@@ -79,7 +79,7 @@ Download both datasets and place them in `data/raw/`:
 
 ### 3. Configure environment variables
 
-Copy `.env.example` to `.env` and fill in your credentials:
+Copy this example to `.env` and fill in your credentials:
 
 ```env
 DB_HOST=localhost
@@ -88,7 +88,7 @@ DB_PASSWORD=your_password
 DB_PORT=3306
 DB_NAME=music_dw
 GOOGLE_CREDENTIALS_PATH=/opt/etl/credentials/service_account.json
-GOOGLE_DRIVE_FOLDER_ID=your_folder_id   # optional
+GOOGLE_DRIVE_FOLDER_ID=your_folder_id   
 ```
 
 ### 4. Run initial setup
