@@ -113,10 +113,12 @@ def extract_grammys() -> pd.DataFrame:
     Reads all columns as-is; type casting happens in transform.py.
     The table must have been populated by load_grammys_db.py beforehand.
     """
-    host     = os.environ.get("DB_HOST", "localhost")
-    port     = os.environ.get("DB_PORT", "3306")
+    
+    host = os.environ.get("DB_HOST", "localhost")
+    port = os.environ.get("DB_PORT", "3306")
     database = os.environ.get("DB_NAME", "music_dw")
-    print(f"\nGrammys  ->  MySQL [{host}:{port}]  db={database}  table={GRAMMYS_TABLE}")
+    
+    print(f"\nGrammys -> MySQL [{host}:{port}] db={database} table={GRAMMYS_TABLE}")
 
     try:
         engine = _get_engine()

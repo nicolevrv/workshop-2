@@ -75,6 +75,7 @@ x-airflow-common:
     - ../src:/opt/etl/src
     - ../data:/opt/etl/data
     - ../sql:/opt/etl/sql
+    - ../credentials:/opt/etl/credentials
   user: "${AIRFLOW_UID:-50000}:0"
   depends_on:
     &airflow-common-depends-on

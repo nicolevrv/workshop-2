@@ -1,6 +1,5 @@
 -- create_schema.sql
--- Creates the music_dw database and all star schema tables.
--- Safe to re-run: DROP IF EXISTS ensures a clean slate each execution.
+-- Creates the music_dw database and all tables (source + star schema).
 
 CREATE DATABASE IF NOT EXISTS music_dw
     CHARACTER SET utf8mb4
@@ -8,12 +7,32 @@ CREATE DATABASE IF NOT EXISTS music_dw
 
 USE music_dw;
 
--- ── Drop in reverse FK order ──────────────────────────────────────────────────
+-- ── Drop in reverse order ─────────────────────────────────────────────────────
 DROP TABLE IF EXISTS fact_track;
 DROP TABLE IF EXISTS dim_album;
 DROP TABLE IF EXISTS dim_genre;
 DROP TABLE IF EXISTS dim_time;
 DROP TABLE IF EXISTS dim_artist;
+DROP TABLE IF EXISTS grammys_raw;  -- ← AGREGAR
+
+-- ── Source table: grammys_raw ───────────────────────────────────────────────────
+CREATE TABLE IF NOT EXISTS grammys_raw (
+    id              INT             NOT NULL AUTO_INCREMENT,
+    year            SMALLINT,
+    title           VARCHAR(500),
+    published_at    VARCHAR(100),
+    updated_at      VARCHAR(100),
+    category        VARCHAR(500),
+    nominee         VARCHAR(500),
+    artist          VARCHAR(500),
+    workers         TEXT,
+    img             VARCHAR(1000),
+    winner          VARCHAR(10),
+    PRIMARY KEY (id),
+    KEY idx_grammy_year (year),
+    KEY idx_grammy_artist (artist),
+    KEY idx_grammy_category (category)
+);
 
 -- ── dim_artist ────────────────────────────────────────────────────────────────
 CREATE TABLE dim_artist (
@@ -27,6 +46,7 @@ CREATE TABLE dim_artist (
     PRIMARY KEY (artist_key),
     UNIQUE KEY uq_artist_norm (artist_norm)
 );
+
 
 -- ── dim_album ─────────────────────────────────────────────────────────────────
 CREATE TABLE dim_album (

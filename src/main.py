@@ -34,6 +34,7 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
+
 # ── Project root on sys.path so sibling imports work ─────────────────────────
 ROOT = Path(__file__).parent.parent
 sys.path.insert(0, str(ROOT / "src"))
@@ -48,6 +49,8 @@ from load_dw import load_star_schema, save_to_google_drive
 # ── Output paths ────────────────────────────────────────────────────────────
 PROCESSED_PATH = ROOT / "data" / "processed"
 STAR_PATH = ROOT / "data" / "star_schema"
+ # Credentials path is read from GOOGLE_CREDENTIALS_PATH env var in load_dw.py and load_grammys_db.py
+# CREDENTIALS_PATH = ROOT / "credentials" / "service-account.json"
 
 
 # ── Optional local CSV export ───────────────────────────────────────────────
@@ -80,23 +83,16 @@ class _Timer:
 
 
 # ── Main pipeline ───────────────────────────────────────────────────────────
-def run(skip_dw: bool = False, skip_drive: bool = False, export: bool = False) -> None:
-    """
-    Execute the full ETL pipeline.
-    
-    Parameters
-    ----------
-    skip_dw : if True, skips the MySQL Data Warehouse load step.
-    skip_drive : if True, skips the Google Drive CSV upload step.
-    export : if True, saves star schema tables as local CSVs.
-    """
+# main.py
+
+def run(skip_dw: bool = False, skip_drive: bool = False, export_csv: bool = False):
     pipeline_start = time.perf_counter()
     
-    print("\n" + "█" * 70)
+    print("\n" + "="*70)
     print("  RUNNING FULL ETL PIPELINE")
-    print("█" * 70)
+    print("="*70)
     
-    # ── a. Extract ──────────────────────────────────────────────────────────
+    # ── a. Extract ─────────────────────────────────────────────────
     with _Timer("Extract"):
         spotify_df, grammy_df = extract_run()
     
@@ -130,9 +126,9 @@ def run(skip_dw: bool = False, skip_drive: bool = False, export: bool = False) -
             save_to_google_drive(merged_df)
     
     # ── Optional local CSV export ────────────────────────────────────────────
-    if export:
-        with _Timer("CSV export"):
-            export_csv(tables, STAR_PATH)
+   # if export_csv:
+    #    with _Timer("CSV export"):
+     #       export_csv(tables, STAR_PATH)
     
     # ── Summary ──────────────────────────────────────────────────────────────
     total = time.perf_counter() - pipeline_start
@@ -176,5 +172,5 @@ if __name__ == "__main__":
     run(
         skip_dw=args.skip_dw,
         skip_drive=args.skip_drive,
-        export=args.export_csv,
+        export_csv=args.export_csv,
     )

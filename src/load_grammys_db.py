@@ -90,7 +90,7 @@ def _table_has_data(cursor) -> bool:
 # ── Main ──────────────────────────────────────────────────────────────────────
 def run(force: bool = False) -> None:
     print("\n" + "=" * 70)
-    print("SETUP — Loading Grammy Awards CSV → MySQL")
+    print("SETUP — Loading Grammy Awards CSV to MySQL")
     print("=" * 70)
 
     # 1. Validate CSV exists
@@ -122,7 +122,7 @@ def run(force: bool = False) -> None:
 
     if _table_has_data(cur) and not force:
         print(
-            f"\n  ℹ️  Table '{GRAMMYS_TABLE}' already has data.\n"
+            f"\n  Table '{GRAMMYS_TABLE}' already has data.\n"
             f"  Run with --force to truncate and reload.\n"
             f"  Skipping insert."
         )
@@ -165,12 +165,12 @@ def run(force: bool = False) -> None:
     # 6. Verify
     cur.execute(f"SELECT COUNT(*) FROM {GRAMMYS_TABLE};")
     count = cur.fetchone()[0]
-    print(f"  Rows in table after insert: {count:,} ✔")
+    print(f"  Rows in table after insert: {count:,} ")
 
     cur.close()
     conn.close()
 
-    print("\nGrammy dataset loaded into MySQL successfully ✔")
+    print("\nGrammy dataset loaded into MySQL successfully")
     print(f"  Database : {DB_NAME}")
     print(f"  Table    : {GRAMMYS_TABLE}")
 

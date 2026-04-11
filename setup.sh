@@ -39,19 +39,34 @@ fi
 # 3. Install dependencies if needed
 pip install -q mysql-connector-python pandas python-dotenv sqlalchemy
 
-# 4. Load Grammys into MySQL
-echo "Loading Grammys into MySQL..."
-python src/load_grammys_db.py --force
-
+# ── 1. CREATE DATABASE AND TABLES FIRST ───────────────────────────────
+echo "[1/3] Creating database and schema..."
+python -c "
+import sys
+sys.path.insert(0, 'src')
+from extract import init_database
+init_database()
+"
 if [ $? -ne 0 ]; then
-    echo "❌ Error loading data into MySQL"
-    echo "Verify that MySQL is running and credentials are correct in .env"
+    echo "❌ Failed to create database schema"
     exit 1
 fi
 
+# ── 2. LOAD GRAMMYS INTO MYSQL ───────────────────────────────────────
+echo "[2/3] Loading Grammys data into MySQL..."
+python src/load_grammys_db.py
+if [ $? -ne 0 ]; then
+    echo "❌ Error loading Grammy data"
+    exit 1
+fi
+
+# ── 3. VERIFY ──────────────────────────────────────────────────────
+echo "[3/3] Setup completed successfully!"
 echo ""
-echo "✅ Setup completed successfully"
+echo "Database 'music_dw' created with tables:"
+echo "  - grammys_raw (source data)"
+echo "  - dim_artist, dim_album, dim_genre, dim_time, fact_track (star schema)"
 echo ""
 echo "Next steps:"
-echo "  1. Test locally:    python src/main.py --skip-drive"
-echo "  2. Start Airflow:   cd airflow && docker-compose up -d"
+echo "  Test locally:  python src/main.py --skip-drive --export-csv"
+echo "  Start Airflow: cd airflow && docker-compose up -d"

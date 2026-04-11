@@ -33,20 +33,21 @@ if (Test-Path "venv\Scripts\Activate.ps1") {
 Write-Host "Installing dependencies..." -ForegroundColor Gray
 pip install -q mysql-connector-python pandas python-dotenv sqlalchemy
 
-# 4. Load Grammys
-Write-Host "Loading Grammys into MySQL..." -ForegroundColor Green
-python src/load_grammys_db.py --force
-
+# ── 2. LOAD GRAMMYS INTO MYSQL ───────────────────────────────────────
+Write-Host "[2/3] Loading Grammys data into MySQL..."
+python src/load_grammys_db.py
 if ($LASTEXITCODE -ne 0) {
-    Write-Host ""
-    Write-Host "❌ Error loading data into MySQL" -ForegroundColor Red
-    Write-Host "Verify that MySQL is running and credentials are correct in .env"
+    Write-Host "❌ Error loading Grammy data" -ForegroundColor Red
     exit 1
 }
 
+# ── 3. VERIFY ──────────────────────────────────────────────────────
+Write-Host "[3/3] Setup completed successfully!" -ForegroundColor Green
 Write-Host ""
-Write-Host "✅ Setup completed successfully" -ForegroundColor Green
+Write-Host "Database 'music_dw' created with tables:"
+Write-Host "  - grammys_raw (source data)"
+Write-Host "  - dim_artist, dim_album, dim_genre, dim_time, fact_track (star schema)"
 Write-Host ""
-Write-Host "Next steps:" -ForegroundColor Cyan
-Write-Host "  1. Test locally:    python src/main.py --skip-drive"
-Write-Host "  2. Start Airflow:   cd airflow && docker-compose up -d"
+Write-Host "Next steps:"
+Write-Host "  Test locally:  python src/main.py --skip-drive --export-csv"
+Write-Host "  Start Airflow: cd airflow && docker-compose up -d"

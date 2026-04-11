@@ -29,6 +29,8 @@ DB_CONFIG = {
 }
 DB_NAME = os.environ.get("DB_NAME", "music_dw")
 
+
+
 # Insert order matters: dimensions before fact (FK constraints)
 INSERT_ORDER = ["dim_artist", "dim_album", "dim_genre", "dim_time", "fact_track"]
 
@@ -119,94 +121,144 @@ def load_star_schema(tables: dict[str, pd.DataFrame]) -> None:
     print("\nData Warehouse load completed ✔")
 
 
-# ── Google Drive export───────────────────────────────────────────────────────
-def save_to_google_drive(
-    merged_df: pd.DataFrame,
-    filename: str = "merged_dataset.csv",
-) -> None:
+def _get_credentials_path() -> Path:
     """
-    Upload the merged dataset to Google Drive as a CSV file.
-
-    Strategy
-    --------
-    Uses the Google Drive API v3 via the google-api-python-client library.
-    Credentials are read from the path in the GOOGLE_CREDENTIALS_PATH
-    environment variable (a service account JSON key).
-    The file is uploaded to the folder specified by GOOGLE_DRIVE_FOLDER_ID
-    (env var). If not set, it uploads to the root of the Drive.
-
-    Setup (one-time)
-    ----------------
-    1. Create a GCP service account with Drive API enabled.
-    2. Share the target Drive folder with the service account email.
-    3. Download the JSON key and set GOOGLE_CREDENTIALS_PATH to its path.
-    4. pip install google-api-python-client google-auth
-
-    Parameters
-    ----------
-    merged_df : the final merged DataFrame to export
-    filename  : name of the CSV file on Google Drive
+    Detects environment and returns correct path to Google credentials.
+    
+    Priority:
+    1. GOOGLE_CREDENTIALS_PATH environment variable (if set and valid)
+    2. Docker: /opt/etl/credentials/service_account.json
+    3. Local: project_root/credentials/service_account.json
     """
+    # Priority 1: Explicit environment variable
+    if env_path := os.environ.get("GOOGLE_CREDENTIALS_PATH"):
+        path = Path(env_path)
+        if path.exists():
+            print(f"✅ Using GOOGLE_CREDENTIALS_PATH: {path}")
+            return path
+        print(f"⚠️  GOOGLE_CREDENTIALS_PATH set but doesn't exist: {path}")
+    
+    # Priority 2: Detect Docker (/opt/etl exists)
+    docker_path = Path("/opt/etl/credentials/service_account.json")
+    if docker_path.exists():
+        print(f"✅ Docker mode detected: {docker_path}")
+        return docker_path
+    
+    # Priority 3: Local mode - path relative to project
+    # This file is in src/load_dw.py, go up 2 levels = project_root
+    project_root = Path(__file__).resolve().parent.parent
+    local_path = project_root / "credentials" / "service_account.json"
+    
+    if local_path.exists():
+        print(f"✅ Local mode detected: {local_path}")
+        return local_path
+    
+    # Not found - raise informative error
+    raise FileNotFoundError(
+        f"\n🔴 service_account.json not found in any location:\n"
+        f"   1. Env var: {os.environ.get('GOOGLE_CREDENTIALS_PATH', 'Not set')}\n"
+        f"   2. Docker:  {docker_path} (exists: {docker_path.exists()})\n"
+        f"   3. Local:   {local_path} (exists: {local_path.exists()})\n\n"
+        f"Solutions:\n"
+        f"   • Place service_account.json in {local_path.parent}/\n"
+        f"   • Or set GOOGLE_CREDENTIALS_PATH=C:/full/path/to/file.json\n"
+        f"   • Or run with --skip-drive to skip Google Drive"
+    )
+
+def save_to_google_drive(df, filename: str = "merged_dataset.csv"):
+    """
+    Uploads DataFrame to Google Drive as CSV.
+    
+    Automatically detects environment (Docker/Windows/Linux) to find
+    service account credentials.
+    """
+    from google.oauth2 import service_account
+    from googleapiclient.discovery import build
+    from googleapiclient.http import MediaFileUpload
+    import tempfile
+    
+    # ── Get dynamic path ─────────────────────────────────────────────
     try:
-        from google.oauth2 import service_account
-        from googleapiclient.discovery import build
-        from googleapiclient.http import MediaInMemoryUpload
-    except ImportError:
-        raise ImportError(
-            "Google API libraries not installed.\n"
-            "Run: pip install google-api-python-client google-auth"
+        creds_path = _get_credentials_path()
+    except FileNotFoundError as e:
+        # If no credentials, warn but don't fail the pipeline
+        print(f"\n⚠️  Google Drive upload skipped: {e}")
+        print("✅  Data Warehouse was loaded successfully.")
+        print("✅  Use --export-csv to save locally if needed.")
+        return None  # Pipeline doesn't fail
+    
+    folder_id = os.environ.get("GOOGLE_DRIVE_FOLDER_ID")
+    if not folder_id:
+        print("⚠️  GOOGLE_DRIVE_FOLDER_ID not set. Skipping Drive upload.")
+        return None
+    
+    print(f"\n📤 Uploading to Google Drive...")
+    print(f"   Credentials: {creds_path}")
+    print(f"   Folder ID:   {folder_id[:15]}...")
+    
+    # ── Authentication ─────────────────────────────────────────────────
+    try:
+        credentials = service_account.Credentials.from_service_account_file(
+            str(creds_path),
+            scopes=['https://www.googleapis.com/auth/drive']
         )
-
-    creds_path = os.environ.get("GOOGLE_CREDENTIALS_PATH")
-    if not creds_path or not Path(creds_path).exists():
-        raise FileNotFoundError(
-            "Google credentials not found.\n"
-            "Set the GOOGLE_CREDENTIALS_PATH environment variable to the "
-            "path of your service account JSON key."
-        )
-
-    folder_id = os.environ.get("GOOGLE_DRIVE_FOLDER_ID")  # optional
-
-    print(f"\nUploading '{filename}' to Google Drive...")
-
-    # Auth
-    scopes = ["https://www.googleapis.com/auth/drive.file"]
-    creds = service_account.Credentials.from_service_account_file(
-        creds_path, scopes=scopes
-    )
-    service = build("drive", "v3", credentials=creds)
-
-    # Serialize to CSV in memory
-    csv_bytes = merged_df.to_csv(index=False).encode("utf-8")
-    media = MediaInMemoryUpload(csv_bytes, mimetype="text/csv", resumable=False)
-
-    # File metadata
-    file_metadata = {"name": filename}
-    if folder_id:
-        file_metadata["parents"] = [folder_id]
-
-    # Check if file already exists — update instead of duplicating
-    query = f"name='{filename}' and trashed=false"
-    if folder_id:
-        query += f" and '{folder_id}' in parents"
-
-    existing = (
-        service.files()
-        .list(q=query, fields="files(id, name)")
-        .execute()
-        .get("files", [])
-    )
-
-    if existing:
-        file_id = existing[0]["id"]
-        service.files().update(fileId=file_id, media_body=media).execute()
-        print(f"  Updated existing file (id={file_id}) ✔")
-    else:
-        result = service.files().create(
-            body=file_metadata, media_body=media, fields="id"
+        service = build('drive', 'v3', credentials=credentials)
+    except Exception as e:
+        print(f"❌ Authentication error: {e}")
+        return None
+    
+    # ── Export to temporary CSV ────────────────────────────────────────
+    try:
+        with tempfile.NamedTemporaryFile(mode='w', suffix='.csv', delete=False) as tmp:
+            df.to_csv(tmp.name, index=False)
+            tmp_path = tmp.name
+            print(f"   Temporary CSV: {tmp_path}")
+    except Exception as e:
+        print(f"❌ Error creating temporary CSV: {e}")
+        return None
+    
+    # ── Upload to Drive ───────────────────────────────────────────────
+    try:
+        file_metadata = {
+            'name': filename,
+            'parents': [folder_id]
+        }
+        
+        media = MediaFileUpload(tmp_path, mimetype='text/csv', resumable=True)
+        
+        file = service.files().create(
+            body=file_metadata,
+            media_body=media,
+            fields='id, name, webViewLink',
+            supportsAllDrives=True  # Important for shared folders
         ).execute()
-        print(f"  Created new file (id={result['id']}) ✔")
-
+        
+        file_id = file.get('id')
+        file_link = file.get('webViewLink')
+        file_name = file.get('name')
+        
+        print(f"✅ Uploaded successfully:")
+        print(f"   Name: {file_name}")
+        print(f"   ID:   {file_id}")
+        print(f"   Link: {file_link}")
+        
+        return file_link
+        
+    except Exception as e:
+        print(f"❌ Error uploading to Drive: {e}")
+        # If quota error, give specific hint
+        if "storageQuotaExceeded" in str(e) or "do not have storage quota" in str(e):
+            print("\n💡 Tip: Service accounts don't have Drive storage quota.")
+            print("   Share the folder with the service account (Editor)")
+            print("   or use --skip-drive to skip this step.")
+        return None
+        
+    finally:
+        # Clean up temporary file
+        try:
+            Path(tmp_path).unlink(missing_ok=True)
+        except Exception:
+            pass
 
 # ── Standalone runner (development only)──────────────────────────────────────
 if __name__ == "__main__":

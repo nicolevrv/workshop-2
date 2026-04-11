@@ -103,7 +103,20 @@ bash setup.sh
 
 This will: install dependencies, and load the Grammy CSV into MySQL (`grammys_raw` table).
 
-### 5. Start Airflow
+### 5. run 'create_db.sql' manually once to create the music_dw DB.
+
+On CMD.
+```
+mysql -u root -p < sql/create_db.sql
+```
+On Powershell.
+
+```
+Get-Content sql/create_db.sql | mysql -u root -p
+```
+
+
+### 6. Start Airflow
 
 ```bash
 cd airflow
@@ -112,7 +125,9 @@ docker-compose up -d
 
 Open the Airflow UI at `http://localhost:8080` and trigger the `spotify_grammys_etl` DAG manually.
 
-### 6. (Optional) Run locally without Airflow
+
+
+### 7. (Optional) Run locally without Airflow
 
 ```bash
 # Skip Google Drive and DW load if credentials aren't set up
